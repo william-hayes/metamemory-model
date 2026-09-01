@@ -1,0 +1,92 @@
+---
+title: "BIM-MC Parameter Recovery"
+author: "Will Hayes"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Load parameter recovery results
+
+```{r}
+results <- readRDS('../../Results/BIM_MC_Recovery.RDS')
+```
+
+## 2. Check R-hat convergence criterion
+
+All runs seemed to converge without any issues.
+
+```{r}
+rhats <- sapply(results, function(L) L$Rhats)
+max(rhats)
+all(rhats < 1.05)
+hist(rhats, main='R-hat values')
+```
+
+
+## 3. True and recovered parameters 
+
+We will use the posterior means as point estimates.
+
+```{r}
+trueParams <- sapply(results, function(L) L$true)
+recoveredParams <- sapply(results, function(L) L$recovered)
+```
+
+Label instances where the simulated data had only 1 out of 3 memory outcomes or 1 out of 3 JOL ratings. It should be very difficult to estimate the $\rho$ parameter for these cases.
+
+```{r}
+zeroCells <- sapply(results, function(L) sum(L$data == 0))
+allZeroRows <- sapply(results, function(L) sum(apply(L$data, 1, function(x) all(x == 0))))
+allZeroCols <- sapply(results, function(L) sum(apply(L$data, 2, function(x) all(x == 0))))
+
+twoZeroRowsOrCols <- as.integer(allZeroCols >= 2 | allZeroRows >= 2)
+```
+
+Parameter recovery correlations were generally very high (r > 0.90). The one exception is the $\rho$ parameter (r = 0.66). As expected, $\rho$ was essentially non-identifiable in cases where only one memory outcome or JOL rating level was represented in the data (red dots). 
+
+```{r}
+par(mfrow=c(2,3), mar=c(3,3,2,2))
+plot(trueParams[1,], recoveredParams[1,], xlab='true', ylab='recovered',
+     main=expression('P'['exp']), las=1); abline(0,1)
+mtext(paste('r = ', round(cor(trueParams[1,], recoveredParams[1,]), 2)), side=3, line=-1.5, adj=0.1)
+plot(trueParams[2,], recoveredParams[2,], xlab='true', ylab='recovered',
+     main=expression(mu['m']), las=1); abline(0,1)
+mtext(paste('r = ', round(cor(trueParams[2,], recoveredParams[2,]), 2)), side=3, line=-1.5, adj=0.1)
+plot(trueParams[3,], recoveredParams[3,], xlab='true', ylab='recovered',
+     main=expression('M'['conf']), las=1); abline(0,1)
+mtext(paste('r = ', round(cor(trueParams[3,], recoveredParams[3,]), 2)), side=3, line=-1.5, adj=0.1)
+plot(trueParams[4,], recoveredParams[4,], xlab='true', ylab='recovered',
+     main=expression(rho), las=1, col=ifelse(twoZeroRowsOrCols, 'red', 'cyan')); abline(0,1)
+mtext(paste('r = ', round(cor(trueParams[4,], recoveredParams[4,]), 2)), side=3, line=-1.5, adj=0.1)
+plot(trueParams[5,], recoveredParams[5,], xlab='true', ylab='recovered',
+     main=expression('crit'), las=1); abline(0,1)
+mtext(paste('r = ', round(cor(trueParams[5,], recoveredParams[5,]), 2)), side=3, line=-1.5, adj=0.1)
+```
+
+Removing those extreme cases improves the recovery correlation for $\rho$ while leaving the other correlations unaffected.
+
+```{r}
+trueParams_cleaned <- trueParams[,twoZeroRowsOrCols == 0]
+recoveredParams_cleaned <- recoveredParams[,twoZeroRowsOrCols == 0]
+
+par(mfrow=c(2,3), mar=c(3,3,2,2))
+plot(trueParams_cleaned[1,], recoveredParams_cleaned[1,], xlab='true', ylab='recovered',
+     main=expression('P'['exp']), las=1); abline(0,1)
+mtext(paste('r = ', round(cor(trueParams_cleaned[1,], recoveredParams_cleaned[1,]), 2)), side=3, line=-1.5, adj=0.1)
+plot(trueParams_cleaned[2,], recoveredParams_cleaned[2,], xlab='true', ylab='recovered',
+     main=expression(mu['m']), las=1); abline(0,1)
+mtext(paste('r = ', round(cor(trueParams_cleaned[2,], recoveredParams_cleaned[2,]), 2)), side=3, line=-1.5, adj=0.1)
+plot(trueParams_cleaned[3,], recoveredParams_cleaned[3,], xlab='true', ylab='recovered',
+     main=expression('M'['conf']), las=1); abline(0,1)
+mtext(paste('r = ', round(cor(trueParams_cleaned[3,], recoveredParams_cleaned[3,]), 2)), side=3, line=-1.5, adj=0.1)
+plot(trueParams_cleaned[4,], recoveredParams_cleaned[4,], xlab='true', ylab='recovered',
+     main=expression(rho), las=1); abline(0,1)
+mtext(paste('r = ', round(cor(trueParams_cleaned[4,], recoveredParams_cleaned[4,]), 2)), side=3, line=-1.5, adj=0.1)
+plot(trueParams_cleaned[5,], recoveredParams_cleaned[5,], xlab='true', ylab='recovered',
+     main=expression('crit'), las=1); abline(0,1)
+mtext(paste('r = ', round(cor(trueParams_cleaned[5,], recoveredParams_cleaned[5,]), 2)), side=3, line=-1.5, adj=0.1)
+```
