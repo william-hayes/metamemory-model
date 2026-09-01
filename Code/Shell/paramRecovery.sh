@@ -8,6 +8,8 @@
 #SBATCH --mail-type=ALL
 
 module load gnu14/14.2.0
-module load R/4.4.1
+module load R/4.5.0
+
+cd ../Model/
 
 Rscript param_recovery.R
